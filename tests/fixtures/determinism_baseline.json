@@ -1,0 +1,19 @@
+{
+  "schema_version": 2,
+  "locked_at": "2026-07-02T18:11:48Z",
+  "fixture_symbols": [
+    "AAPL",
+    "MSFT",
+    "NVDA"
+  ],
+  "fixture_eval_date": "2026-06-15",
+  "fixture_seed": 42,
+  "fixture_ohlcv_rows_per_symbol": 60,
+  "backend_kind": "DeterministicFakeChronos",
+  "hashes": {
+    "shadow_trade_baseline_v1_2026-06-15": "f9dee004ea7bcf03f6d92fabc12f6dfe1d97ef0fa5cf844c0405cdc9ec3c75d5",
+    "shadow_trade_baseline_v1_SUMMARY": "357a88a3f95ada66e6c1f55e5d53f626a94aa35a5b8422b6f15248248a5e2297",
+    "shadow_ensemble_2026-06-15": "32b27f72d641ddcbb621c6e9bcf7a95aa9521be179e9ade5ce3a90cfb7a92778"
+  },
+  "lock_commit": "d814709951734879feddbd1e629b632f37b0f6e8"
+}

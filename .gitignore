@@ -1,0 +1,87 @@
+# Env & Temp
+venv/
+.DS_Store
+__pycache__/
+*.pyc
+*.log
+wandb/
+AutogluonModels/
+
+# Large files & Data
+data/
+data/*.log
+data/*.csv
+data/*.parquet
+# V19 Polygon Massive Data
+*hoarder*.log
+/models/
+# Exception: Round 3 experiment reports (small JSON/MD/log artifacts for
+# council review) live under models/chronos/_experiments/. Model weights
+# (.safetensors, .pkl) stay excluded via the *.pkl / *.safetensors rules
+# below — the model/ subdirs themselves are also never synced to Mac.
+!models/chronos/_experiments/
+!models/chronos/_experiments/**
+checkpoints/
+logs/
+.pytest_cache/
+**/__pycache__/
+.cache/
+*.parquet
+*.pkl
+*.pt
+*.pth
+*.h5
+*.onnx
+reports/
+.coverage
+htmlcov/
+.mypy_cache/
+.dmypy.json
+.ruff_cache/
+dmypy.json
+.ipynb_checkpoints/
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+.Spotlight-V100
+.Trashes
+
+# Archive (historical, local only)
+archive/
+model_training/archive/
+# WSL shrink artifacts (legacy from v12/ era; v12/ was promoted to root 2026-07-09)
+# v12/wsl_archive/  ← removed: v12/ no longer nested; wsl_archive deleted in migration
+
+# Deploy data snapshots (Docker volumes)
+deploy/data/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+Thumbs.db
+
+# Config
+.env*
+!.env.example
+.venv/
+.python-version
+
+# Injected by Global AI-SDD
+
+# Global AI-SDD Ignore Rules
+.claude/
+*.claude_history
+.cline/
+.task-master-ai/
+# Python
+__pycache__/
+*.pyc
+venv/
+.env/
+# OS
+.DS_Store
+# IDE
+.vscode/

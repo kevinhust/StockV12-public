@@ -1,0 +1,46 @@
+# ADR-010 E-SEAT — side-car ensembles (observation only, no paper trades).
+#
+# Production decision path remains:
+#   models/chronos/_shadow/ensemble/   (phase2_v2 + E05_p3_coldstart_seed42)
+#
+# Seat runs write under:
+#   models/chronos/_shadow/ensemble_seat_<name>/
+# and must never use dir name "ensemble".
+
+version: 1
+adr: ADR-010
+trade_path_dir: ensemble
+
+seats:
+  e09:
+    dir_name: ensemble_seat_e09
+    ensemble_name: seat_phase2_v2_E09
+    models:
+      - phase2_v2
+      - E09_higher_lr
+    rationale: >
+      E-EVAL 2026-07-26: E09 leads 20d window on PnL with strong MASE/hit.
+      Candidate B replacement for ensemble if A+B underperforms after ≥15–20 days.
+    fallback_spread_pct: 3.0
+    enabled: true
+
+  # Optional second seat (disabled by default)
+  e08:
+    dir_name: ensemble_seat_e08
+    ensemble_name: seat_phase2_v2_E08
+    models:
+      - phase2_v2
+      - E08_fewer_steps
+    rationale: >
+      E08 close second on 20d; alternate quality challenger.
+    fallback_spread_pct: 3.0
+    enabled: false
+
+# How to run a seat once (NUC / Mac):
+#   PYTHONPATH=src:scripts:. python scripts/shadow_ensemble.py \
+#     --seat --ensemble-dir-name ensemble_seat_e09 \
+#     --models phase2_v2 E09_higher_lr \
+#     --today 2026-07-24
+#
+# Daily (optional cron 16:12 ET after main ensemble):
+#   scripts/run_shadow_ensemble_seat.sh

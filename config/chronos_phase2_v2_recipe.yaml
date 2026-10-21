@@ -1,0 +1,81 @@
+# ADR-010 D3 — Frozen phase2_v2 fine-tune recipe (single source of truth).
+#
+# Verified 2026-07-26 against GPU box (ssh gpu):
+#   /home/trainer/Stockapp/models/chronos/phase2_v2/train_meta.json
+#   /home/trainer/Stockapp/models/chronos/phase2_v2/baseline_report.md
+#
+# Any monthly walk-forward retrain producing phase2_vN MUST match this recipe
+# except for train data cutoff date. Do not increase steps "to try harder"
+# (v3 postmortem: long fine-tune overfits).
+
+version: 2
+adr: ADR-010
+recipe_name: phase2_v2
+verified_at: "2026-07-26"
+verified_host: "gpu:/home/trainer/Stockapp/models/chronos/phase2_v2"
+source_artifacts:
+  train_meta: models/chronos/phase2_v2/train_meta.json
+  baseline_report: models/chronos/phase2_v2/baseline_report.md
+  version_txt: "1.5.0"   # AutoGluon predictor version.txt on disk
+
+backbone: autogluon/chronos-bolt-small
+framework: autogluon.timeseries
+mode: finetune
+target: close
+eval_metric: MASE
+
+# Exact values from train_meta.json (generated 2026-06-25T11:41:27)
+hyperparameters:
+  model_path: bolt_small
+  fine_tune: true
+  fine_tune_steps: 1000        # train_meta.steps — NOT 200 (report snippet is stale)
+  fine_tune_lr: 1.0e-5         # train_meta.lr
+  fine_tune_batch_size: 32     # train_meta.batch_size
+  context_length: 512          # train_meta.context_length
+  prediction_length: 10        # train_meta.prediction_length + shadow FORECAST_HORIZON
+  eval_during_fine_tune: false
+
+data:
+  features_dir: data/features/daily
+  n_symbols: 203               # train_meta.n_symbols (full phase2 universe)
+  symbols: null                # null = same 203 list as train_meta.symbols
+  # Walk-forward: only rows with timestamp <= retrain_cutoff (trading day)
+  cutoff_field: timestamp
+  train_elapsed_seconds: 80.33 # informational
+
+# AutoGluon hyperparameters dict shape used by train_chronos_baseline.py:
+# hyperparameters={"Chronos": [{
+#   "model_path": "bolt_small",
+#   "context_length": 512,
+#   "fine_tune": True,
+#   "fine_tune_lr": 1e-5,
+#   "fine_tune_steps": 1000,
+#   "fine_tune_batch_size": 32,
+#   "eval_during_fine_tune": False,
+# }]}
+
+gates_for_promotion:
+  - ADR-008 walk-forward PASS on accumulated shadow (or H2H panel)
+  - last 20 trading days sim metrics not worse than phase2_v2
+  - n_trades in 20d window >= 15
+  - HaltGate 3d rate not worse than baseline
+  - human approval
+
+banned:
+  - fine_tune_steps >> 1000 without new ADR
+  - new hyperparam family under this recipe name
+  - promote on cumulative PnL alone
+  - using baseline_report "Reproducibility --steps 200" (incorrect for this ckpt)
+
+# Peer observation models (GPU train_meta, 2026-07-26) — not D3 recipe, reference only:
+#   E05_seed42: steps=5000, lr=1e-5, ctx=512, batch=16, seed=42  (cold-start P3)
+#   E06: steps=200,  lr=1e-5, ctx=256, batch=16
+#   E07: steps=200,  lr=1e-5, ctx=1024, batch=16
+#   E08: steps=100,  lr=1e-5, ctx=512, batch=16
+#   E09: steps=200,  lr=5e-5, ctx=512, batch=16   ← E-SEAT B model
+#   E10: steps=500,  lr=1e-5, ctx=512, batch=16
+
+operator_notes: >
+  D3 monthly retrain: copy this recipe, set retrain_cutoff to last trading day,
+  write models/chronos/phase2_vN/, run shadow with new dir as observation only
+  until gates pass. Do not overwrite phase2_v2 in place.

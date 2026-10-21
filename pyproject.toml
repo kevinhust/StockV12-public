@@ -1,0 +1,50 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "stockapp-v12"
+version = "12.0.0"
+description = "StockApp V12 swing-trading system (Chronos + YOLO)"
+readme = "README.md"
+requires-python = ">=3.11"
+# Runtime deps stay environment-managed (venv / NUC); package is path layout.
+
+[project.scripts]
+stockapp-demo-wiring = "stockapp_v12.app.cli:demo_wiring"
+stockapp-check-boundaries = "stockapp_v12.app.cli:check_boundaries"
+stockapp-cli = "stockapp_v12.app.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["stockapp_v12*"]
+
+[tool.pytest.ini_options]
+# Post-migration (2026-07-09): v12/ promoted to project root.
+# Single src/ and tests/ trees; no v12/ prefix needed.
+testpaths = ["tests"]
+pythonpath = ["src", "scripts"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+asyncio_mode = "auto"
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests requiring real Redis/API",
+    "unit: fast unit tests with no external deps",
+]
+# V11-era tests broken by the v12/→root migration. Kept on disk for
+# historical reference in archive/v11-legacy-2026-07-09/ but excluded
+# from the active test run. Follow-up task: re-implement on V12 APIs.
+# Narrow DeprecationWarning suppression to specific known-noise sources.
+# Previously used blanket "ignore::DeprecationWarning" which hid all
+# deprecation signals including those from our own dependencies.
+filterwarnings = [
+    "ignore::DeprecationWarning:pkg_resources",
+    "ignore::DeprecationWarning:longport",
+    "ignore::DeprecationWarning:redis",
+]
+# Tests broken by missing V11-only dependencies (fetch_polygon_training_data.py
+# moved to archive during migration). See Q4 in migration plan.
+# Tracked as pre-existing failures; do not regress.
