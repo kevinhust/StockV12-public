@@ -1,0 +1,13 @@
+[tool.pytest.ini_options]
+testpaths = ["tests", "v12/tests"]
+pythonpath = ["src", "v12/src"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+asyncio_mode = "auto"
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests requiring real Redis/API",
+    "unit: fast unit tests with no external deps",
+]

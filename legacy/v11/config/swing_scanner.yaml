@@ -1,0 +1,68 @@
+# V12 SwingScanner Configuration
+# Daily-bar L1 candidate generator (16:30 ET, previous close data)
+# Spec: v12/docs/TRADING_PIPELINE.md Stage 1 SCAN
+
+version: "v12-1"
+
+# Output limits
+output_top_n: 20          # max symbols in watchlist:tier1
+tier2_top_n: 10           # recommended max for CatalystScorer downstream
+
+# Universe source (shared with other V12 components)
+universe:
+  source: "config/universe.yaml:static_universe"
+  fallback_min_size: 30
+
+# ─────────────────────────────────────────────────────────────
+# Hard Filters (AND — all must pass to be candidate)
+# ─────────────────────────────────────────────────────────────
+filters:
+  price_range:
+    min: 10
+    max: 500
+  min_avg_dollar_volume_20d: 30000000   # $30M
+  min_atr_percent_14d: 0.030            # 3.0%
+  min_relative_strength_20d: 0.0        # excess vs SPY >= 0 (non-negative)
+  max_distance_from_52w_high: 0.25      # within 25% of 52w high
+  require_above_ema20: true
+
+  # Locked hard filters (2026-06-19)
+  min_adx_14: 20.0                    # ADX(14) > 20 (trend strength)
+  rsi:
+    min: 40.0
+    max: 75.0                         # RSI(14) band for swing entries
+
+# ─────────────────────────────────────────────────────────────
+# Scoring (ranking, not filter)
+# composite = sum(w_i * norm_i)
+# Each component normalized to ~[0, 1] range before weighting.
+# ─────────────────────────────────────────────────────────────
+scoring:
+  weights:
+    relative_strength_20d: 0.30
+    atr_percent_14d: 0.25
+    volume_breakout_score: 0.25
+    pivot_proximity: 0.20
+
+  # Normalization caps (for scoring only)
+  normalization:
+    rs_max: 0.15                 # cap raw excess return at +15%
+    atr_max: 0.12                # cap ATR% at 12% for score
+    vol_breakout_max: 3.0        # vol ratio cap before norm
+    pivot_max: 1.0
+
+# Redis keys (V12 contract — shared)
+redis:
+  tier1_zset: "watchlist:tier1"
+  tier1_details: "watchlist:tier1:details"
+  ttl_seconds: 86400   # 24h
+
+# Data fetch
+data:
+  prefer_longbridge: true
+  polygon_fallback: true
+  lookback_days: 260   # ~1 trading year for 52w high + indicators
+  spy_symbol: "SPY"
+
+# Logging / debug
+log_level: "INFO"

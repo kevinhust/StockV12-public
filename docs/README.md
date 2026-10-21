@@ -29,6 +29,6 @@ ADR-008 (walk-forward promotion gate) lives in Obsidian + is summarized in [V3_L
 
 Reference (non-normative): [_reference/INDUSTRY_REFERENCES.md](_reference/INDUSTRY_REFERENCES.md)
 
-V11 code snapshot: not included in this public snapshot.
+V11 code snapshot (slimmed reference): [../legacy/v11/](../legacy/v11/README.md) · Architecture history: [ARCHITECTURE_EVOLUTION.md](ARCHITECTURE_EVOLUTION.md)
 
 V12 implementation: `src/stockapp_v12/` (see [../README.md](../README.md))

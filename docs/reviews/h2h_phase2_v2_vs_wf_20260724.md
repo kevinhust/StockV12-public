@@ -4,7 +4,7 @@
 **Host:** GPU (`ssh gpu`)  
 **Symbols:** AAPL NVDA TSLA JPM MSFT AMZN AMD META GOOGL SPY  
 **Cutoffs:** 10d, 20d  
-**Raw JSON:** [h2h_phase2_v2_vs_wf_20260724.json](h2h_phase2_v2_vs_wf_20260724.json)
+**Raw JSON:** `h2h_phase2_v2_vs_wf_20260724.json` *(raw JSON not included in public snapshot)*
 
 ## Summary
 

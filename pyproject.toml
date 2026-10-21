@@ -23,6 +23,8 @@ include = ["stockapp_v12*"]
 # Post-migration (2026-07-09): v12/ promoted to project root.
 # Single src/ and tests/ trees; no v12/ prefix needed.
 testpaths = ["tests"]
+# legacy/v11 is a read-only reference snapshot of the V11 code; never collect it.
+norecursedirs = ["legacy", ".git", ".venv", "venv", "build", "dist", "*.egg-info"]
 pythonpath = ["src", "scripts"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
@@ -35,7 +37,7 @@ markers = [
     "unit: fast unit tests with no external deps",
 ]
 # V11-era tests broken by the v12/→root migration. Kept on disk for
-# historical reference in archive/v11-legacy-2026-07-09/ but excluded
+# historical reference in the private archive (slim snapshot: legacy/v11/) but excluded
 # from the active test run. Follow-up task: re-implement on V12 APIs.
 # Narrow DeprecationWarning suppression to specific known-noise sources.
 # Previously used blanket "ignore::DeprecationWarning" which hid all

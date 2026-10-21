@@ -1,0 +1,32 @@
+# Production Universe Configuration
+# Defines which stocks are "Active" for the Shadow Runner / Live Trading.
+# Only data for these tickers will be pre-loaded, saving RAM/IO.
+
+mode: "static_plus_dynamic" # static only, or static + scanner results
+
+static_universe:
+  # Mid-Vol Top 20 (Matching Chronos v5 Training)
+  - AAPL
+  - MSFT
+  - GOOGL
+  - AMZN
+  - META
+  - NFLX
+  - ADBE
+  - CRM
+  - NOW
+  - UBER
+  - PYPL
+  - SQ
+  - SHOP
+  - TTD
+  - OKTA
+  - MDB
+  - HUBS
+  - DDOG
+  - NET
+  - ZS
+
+dynamic_limits:
+  max_active_symbols: 40 # Max total symbols (Static + Dynamic)
+  data_load_lookback_days: 200 # Only load recent history for proper indicator calc

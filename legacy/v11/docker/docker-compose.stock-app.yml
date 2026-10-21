@@ -1,0 +1,185 @@
+# RealtimeStockAnalysis - Total Independence Stack (NUC)
+# 端口记录: 8000 (UI), 8001 (Scanner), 8003 (Shadow), 8501 (Review Dashboard)
+
+x-app-defaults: &app-defaults
+  build:
+    context: ..
+    dockerfile: Dockerfile
+  restart: unless-stopped
+  env_file:
+    - .env.nuc
+  volumes:
+    - ..:/app:rw
+    - ../data:/app/data
+    - ../logs:/app/logs
+  networks:
+    - stock-net
+  depends_on:
+    stock-redis:
+      condition: service_started
+    stock-db:
+      condition: service_started
+    stock-kafka:
+      condition: service_healthy # 关键：等待 Kafka 就绪
+
+services:
+  # 0. IB Gateway (Docker, auto-login via IBC Alpha)
+  ibgw:
+    image: ghcr.io/extrange/ibkr:stable
+    container_name: stock_ibgw
+    restart: unless-stopped
+    environment:
+      GATEWAY_OR_TWS: gateway
+      IBC_TradingMode: paper
+      IBC_ExistingSessionDetectedAction: primary
+      IBC_AcceptNonBrokerageAccountWarning: yes
+      IBC_AcceptIncomingConnectionAction: accept
+      USERNAME: ${IBKR_USERNAME}
+      PASSWORD: ${IBKR_PASSWORD}
+    ports:
+      - "4002:4002"
+    networks:
+      - stock-net
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo 'check'"]
+      interval: 60s
+      timeout: 10s
+      retries: 5
+
+  # 1. 核心交易代理 (Shadow Runner)
+  shadow-runner:
+    <<: *app-defaults
+    container_name: stock_shadow_runner
+    ports:
+      - "8003:8000"
+    environment:
+      - TZ=America/New_York
+      - IB_CLIENT_ID=101          # IBExecutor (order execution)
+      - IB_DATA_CLIENT_ID=100     # DataService (market data queries)
+    command: python3 src/main.py
+
+  # 2. 模式检测器 (Pattern Scanner)
+  pattern-scanner:
+    <<: *app-defaults
+    container_name: stock_pattern_scanner
+    ports:
+      - "8001:8000"
+    command: python3 scripts/pattern_detection_scheduler.py
+
+  # 3. 实时行情流 (Longbridge — primary)
+  longbridge-streamer:
+    <<: *app-defaults
+    container_name: stock_longbridge_streamer
+    environment:
+      - TZ=America/New_York
+    command: python3 src/services/longbridge_realtime_streamer.py
+    depends_on:
+      stock-redis:
+        condition: service_started
+
+  # 4. 延迟行情流 (IBKR Streamer — backup, connects to local IBGW)
+  ibkr-streamer:
+    <<: *app-defaults
+    container_name: stock_ibkr_streamer
+    environment:
+      - IB_CLIENT_ID=110
+      - IB_HOST=ibgw
+      - IB_PORT=4002
+      - IB_MARKET_DATA_TYPE=3  # 3=Delayed (15min), no subscription needed
+    command: python3 src/services/ibkr_realtime_streamer.py
+    depends_on:
+      ibgw:
+        condition: service_started
+
+  # 5. 告警轮询 (Alert Poller)
+  alert-poller:
+    <<: *app-defaults
+    container_name: stock_alert_poller
+    command: python3 src/observability/alert_poller.py
+
+  # 6. 生命周期调度器 (Lifecycle Scheduler)
+  # 运行所有 cron jobs: L1 scanner, L2 catalyst scorer, macro research, EOD pipeline, etc.
+  lifecycle-scheduler:
+    <<: *app-defaults
+    container_name: stock_lifecycle_scheduler
+    command: python3 scripts/run_lifecycle_scheduler.py
+    environment:
+      - TZ=America/New_York
+      - REDIS_HOST=stock_analysis_redis
+      - KAFKA_BOOTSTRAP_SERVERS=stock_analysis_kafka:9092
+
+  # 7. Review Dashboard (Streamlit) - Web UI for detailed review information
+  #    - Post-mortem reviews with full context
+  #    - V12 DailyReview / Position pending actions
+  #    - System health snapshot
+  #    - Approve/Reject decisions (updates Redis for next-day生效)
+  #    Dev on Mac Mini: streamlit run scripts/review_dashboard.py
+  #    On NUC: exposed at http://nuc-host:8501
+  review-dashboard:
+    <<: *app-defaults
+    container_name: stock_review_dashboard
+    ports:
+      - "8501:8501"
+    environment:
+      - TZ=America/New_York
+      - REDIS_HOST=stock_analysis_redis
+    command: streamlit run scripts/review_dashboard.py --server.port 8501 --server.address 0.0.0.0
+    depends_on:
+      stock-redis:
+        condition: service_started
+
+  # --- 基础设施层 (Isolated Infra) ---
+
+  stock-redis:
+    image: redis:7-alpine
+    container_name: stock_analysis_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    networks:
+      - stock-net
+
+  stock-db:
+    image: timescale/timescaledb:latest-pg15
+    container_name: stock_analysis_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-stock_app}
+      POSTGRES_PASSWORD: ${DB_PASS:?set DB_PASS in .env}
+      POSTGRES_DB: ${DB_NAME:-v8_db}
+    volumes:
+      - stock_db_data:/var/lib/postgresql/data
+    networks:
+      - stock-net
+
+  stock-kafka:
+    image: apache/kafka:3.7.0
+    container_name: stock_analysis_kafka
+    restart: unless-stopped
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CLUSTER_ID: stock-analysis-kafka-01
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://stock-kafka:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@stock-kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+    volumes:
+      - stock_kafka_data:/var/lib/kafka/data
+    networks:
+      - stock-net
+    healthcheck:
+      test: ["CMD", "/opt/kafka/bin/kafka-topics.sh", "--bootstrap-server", "localhost:9092", "--list"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+
+volumes:
+  stock_db_data:
+  stock_kafka_data:
+
+networks:
+  stock-net:
+    driver: bridge

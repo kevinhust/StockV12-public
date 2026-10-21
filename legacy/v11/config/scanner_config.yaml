@@ -1,0 +1,128 @@
+# High Volatility Intraday Stock Scanner Configuration
+# Last updated: 2026-04-10
+# Version: 2.4 — Dual funnel profiles (long_only / bidirectional)
+
+# =============================================================
+# Funnel Direction Mode
+# Selects which scoring profile to use for gap/catalyst scoring.
+# "long_only"     — current behavior, rewards gap-ups, penalizes gap-downs
+# "bidirectional" — neutral gap scoring, enables bearish catalyst detection
+# =============================================================
+funnel_mode: long_only
+
+# =============================================================
+# Core Filters (AND logic - all must pass)
+# =============================================================
+filters:
+  # Price range: raised to include TSLA/NVDA class stocks
+  price_range:
+    min: 10.0
+    max: 1000.0
+
+  # Minimum average daily dollar volume (liquidity)
+  avg_dollar_volume_20d:
+    min: 25000000  # $25M — regime-adaptive (see presets below)
+
+  # ATR% = ATR(14) / Previous Close - core volatility metric
+  atr_percent:
+    min: 0.030     # 3.0% base — overridden by VIX/regime logic
+
+  # Beta - market sensitivity (soft factor in composite, not hard filter)
+  beta_1y:
+    min: 1.0       # Lowered — let composite score handle beta preference
+
+  # Gap soft filter (penalty, not hard block)
+  gap:
+    soft_penalty_threshold: -0.10    # gap < -10% → -0.25 composite penalty
+    black_swan_threshold: -0.20      # gap < -20% → hard block
+
+# =============================================================
+# VIX-Adaptive Thresholds
+# =============================================================
+vix_adaptation:
+  high_vix_threshold: 25
+  high_vix_atr_min: 0.030    # 3.0% when VIX > 25
+  normal_atr_min: 0.035      # 3.5% default (was 0.040)
+
+# =============================================================
+# Regime-Adaptive Filter Presets (PRIMARY path)
+# Overrides VIX-only logic when regime is available from Redis.
+# =============================================================
+regime_adaptation:
+  panic_block_all: true
+  presets:
+    BULL_LONG:
+      atr_percent: 0.030
+      min_dollar_volume: 20000000
+    BULL_SHORT:
+      atr_percent: 0.030
+      min_dollar_volume: 20000000
+    NEUTRAL:
+      atr_percent: 0.035
+      min_dollar_volume: 25000000
+    BEAR_SHORT:
+      atr_percent: 0.045
+      min_dollar_volume: 40000000
+    BEAR_LONG:
+      atr_percent: 0.050
+      min_dollar_volume: 50000000
+    PANIC:
+      atr_percent: 0.060
+      min_dollar_volume: 100000000
+
+# =============================================================
+# Ranking Criteria - Composite Score Calculation
+# =============================================================
+ranking:
+  method: "composite_score"
+  weights:
+    relative_volume: 0.40
+    atr_percent: 0.25
+    beta: 0.20
+    gap_percent: 0.15
+  top_n: 40
+
+  # ── Long-Only Profile (current behavior) ──────────────
+  long_only:
+    gap_bonus:
+      monster: {threshold: 0.10, multiplier: 1.15}
+      strong: {threshold: 0.05, multiplier: 1.08}
+    gap_penalty:
+      threshold: -0.10       # gap < -10% triggers penalty
+      value: -0.25           # subtracted from composite
+    gap_black_swan: -0.20
+
+  # ── Bidirectional Profile (neutral gap scoring) ────────
+  bidirectional:
+    gap_bonus:
+      monster: {threshold: 0.10, multiplier: 1.08}    # reduced reward
+      strong: {threshold: 0.05, multiplier: 1.04}
+    gap_penalty: null                                   # no gap-down penalty
+    gap_black_swan: -0.30                               # tighter black swan for shorts
+    # Gap-down becomes a signal for short candidates
+    gap_short_bonus:
+      monster: {threshold: -0.10, multiplier: 1.12}    # big gap-down = short opportunity
+      strong: {threshold: -0.05, multiplier: 1.06}
+
+# =============================================================
+# Universe Sources (run_scanner.py)
+# =============================================================
+universe:
+  min_size: 50
+  polygon_movers:
+    enabled: true
+    top_n: 40
+    min_price: 10.0
+    max_price: 1000.0
+    min_volume: 500000
+    min_change_pct: 0.025
+    max_lookback_days: 5
+
+# =============================================================
+# Redis Configuration
+# =============================================================
+redis:
+  watchlist_key: "watchlist:tier1"
+  ranked_key: "watchlist:ranked"
+  event_channel: "events:watchlist"
+  ttl_seconds: 36000    # 10 hours

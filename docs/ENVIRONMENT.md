@@ -110,7 +110,7 @@ ssh gpu "source ~/yolo_train_env/bin/activate && pip install --quiet pytest pyya
 | Promotion gate（默认） | `hit_rate_mean ≥ 0.55` ∧ `mase_mean ≤ 2.5152 × 1.05` ∧ `hit_rate_std ≤ 0.05`|
 | 输出 | `models/chronos/_experiments/<exp_id>_<name>/<run_id>/` + `index.json` + `experiment_dashboard.md`|
 
-8 个实验见 [`configs/experiments/`](../../configs/experiments/)：E01 5-seed fresh 1k step baseline；E02 5k step；E03 LR/10；E04 warm-init v2（待 trainer 升级 `--base-model-path`）；E05 context 1024；E06 LR×3；E07 分类头（Round 2 deferred）；E08 BEAR-only（Round 2 deferred）。
+8 个实验见 [`configs/experiments/`](../legacy/v11/README.md) (not included in this snapshot)：E01 5-seed fresh 1k step baseline；E02 5k step；E03 LR/10；E04 warm-init v2（待 trainer 升级 `--base-model-path`）；E05 context 1024；E06 LR×3；E07 分类头（Round 2 deferred）；E08 BEAR-only（Round 2 deferred）。
 
 ## 当前 live 生产配置
 

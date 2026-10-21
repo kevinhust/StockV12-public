@@ -1,0 +1,90 @@
+# Paper Soak Configuration (P6 / Phase 4)
+#
+# Task 11 (4.0) — 5-day paper soak config for live validation of both models
+# (Chronos phase2_v1 + YOLO phase2_v1_gpu no-trade filter SR-06).
+#
+# Consumed by:
+#   - v12/scripts/paper_soak_checklist.py (thresholds, lookback, model paths)
+#   - v12/scripts/run_paper_soak.sh (env setup)
+#   - docs/P6_SOAK_CHECKLIST.md (manual run reference)
+
+# === Soak window ===
+duration_days: 5                       # how long the soak runs
+start_date: 2026-06-23                  # intended kickoff (T+0)
+# Note: actual start is manual; this is the reference date for the prep report
+
+# === Soak criteria (the 6 SOAK checks) ===
+# SOAK-1: no manual risk overrides
+# SOAK-2: avg new entries ≤ N per day, no day > N
+max_new_entries_per_day: 3
+
+# SOAK-3: no V11 legacy pattern events
+legacy_pattern_block_keys:
+  - "events.pattern*"
+
+# SOAK-4: YOLO filter is firing (at least 1% blocks; if 0%, model not loaded)
+yolo_block_rate_min: 0.01               # at least 1% blocks expected
+yolo_block_rate_max: 0.50               # at most 50% blocks (else filter too aggressive)
+
+# SOAK-5: model files resolve on scheduler path
+models:
+  chronos: models/chronos/phase2_v1
+  yolo:    models/yolo/phase2_v1_gpu/best.pt
+
+# SOAK-6: env vars are set when scheduler boots
+required_env_vars:
+  - STOCKAPP_V12_RISK
+  - STOCKAPP_V12_ENTRY_ENABLED
+
+# SOAK-7: sign-agreement rate between Chronos forecast and actual trade side.
+# Added 2026-06-29 per v3 postmortem (v12/docs/V3_POSTMORTEM_AND_TRAINING_PLAN.md
+# Stage 1.2) and v12/docs/H2H_V3_REPORT.md "Directional (sign-correctness)
+# metrics" — phase2_v2 hit_rate was 0.30 on the 10-symbol OOS panel, so we
+# expect live agreement to be near coin-flip or worse. SOAK-7 measures this;
+# it is WARN-ONLY and does NOT gate the soak (see sign_agreement_warn_only).
+sign_agreement_floor: 0.5               # below this → warn (not pause)
+sign_agreement_warn_only: true          # if false, would contribute to all_pass
+
+# === Risk / sizing gates (forwarded to scheduler env) ===
+risk:
+  stockapp_v12_risk: "1"
+  stockapp_v12_entry_enabled: "1"
+  # R-05 daily cap (from V12RiskLimits) — fixed by spec
+  daily_trade_cap: 3
+  # R-06 cooldown (hours) — fixed by spec
+  symbol_cooldown_hours: 24
+
+# === Observability ===
+redis:
+  host_env: REDIS_HOST                 # read from env (default: redis)
+  port_env: REDIS_PORT                 # read from env (default: 6379)
+  actionable_list_key: "actionable:today"
+  daily_trade_count_key_prefix: "risk:daily_trades:"
+  sr06_yolo_rejects_key: "lifecycle:sr06_yolo_rejects"
+  # SOAK-7: per-(date,sym) keys written by lifecycle_scheduler at entry time.
+  chronos_signal_key_prefix: "soak:forecast:chronos"
+  trade_side_key_prefix: "soak:trade:side"
+
+# === Daily run (T+0 through T+5) ===
+# Cron jobs that fire during the soak (already wired in lifecycle_scheduler)
+schedule_est:
+  premarket_review: "08:00"            # 08:00 EST — daily watchlist
+  entry_window_open: "09:35"           # 09:35 EST — entry window open
+  entry_window_close: "15:30"          # 15:30 EST — entry window close
+  daily_review: "16:30"                # 16:30 EST — end-of-day review
+  paper_soak_audit: "17:00"            # 17:00 EST — run checklist
+
+# === Escalation (manual review) ===
+# Each item is a human-readable alert condition checked daily by
+# paper_soak_checklist.py. List-of-strings (not mappings) so YAML parser
+# stays happy; semantics are preserved as the metric:threshold pair.
+escalation:
+  # Pause the soak if any of these trip
+  hard_pause:
+    - "sr06_yolo_rejects >= 80% of decisions"   # filter too aggressive
+    - "daily_trade_count > 3"                   # over R-05 cap
+    - "redis_unreachable for > 5 min"
+  # Alert only (don't pause)
+  warn:
+    - "paper_broker_orders == 0 in 2 consecutive days"
+    - "journal_review_decisions < 3 per day"

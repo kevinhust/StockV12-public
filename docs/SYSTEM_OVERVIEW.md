@@ -223,7 +223,7 @@ Key cleanup list: [MIGRATION_GUIDE.md](MIGRATION_GUIDE.md#rollback-procedure).
 
 Reference (non-normative): [_reference/INDUSTRY_REFERENCES.md](_reference/INDUSTRY_REFERENCES.md).
 
-Open spec gaps: [TODO.md](TODO.md).
+Open migration debts: [MIGRATION_DEBT.md](MIGRATION_DEBT.md).
 
 Change log: [../CHANGELOG.md](../CHANGELOG.md) — recent council-review remediation (Sprints F–K, 2026-07-09 → 2026-07-10) restructured the code (new `pipeline.types`, `services._notifier_compat`, `core.StageFallbacks`, `core.nyse_calendar`); this spec document is normative and tracks structural changes only when they affect ownership, invariants, or the dependency graph. See [reviews/council-review-2026-07-09/](reviews/council-review-2026-07-09/) for sprint-by-sprint code-level records.
 

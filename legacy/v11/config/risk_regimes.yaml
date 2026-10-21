@@ -1,0 +1,390 @@
+# =============================================================================
+# Risk Regimes Configuration (Optimized v2.0)
+# Market State (VIX-based) × Stock Type (Volatility Tier)
+# =============================================================================
+#
+# Canonical Regime Names (6-schema, used across all components):
+#   BULL_LONG   — sustained uptrend, low vol   (VIX < 18)
+#   BULL_SHORT  — short-term bullish bounce    (VIX 15-22)
+#   NEUTRAL     — no clear direction           (VIX 18-25)
+#   BEAR_SHORT  — short-term bearish dip       (VIX 18-28)
+#   BEAR_LONG   — sustained downtrend          (VIX 25-35)
+#   PANIC       — extreme fear / crash         (VIX > 35)
+# =============================================================================
+# Version: 2.0
+# Last updated: 2026-02-03
+# Optimization: Based on owner + AI-assisted review
+#
+# Key Changes:
+# - Final target stocks: 8-12 (down from 20)
+# - Overnight position limits: Regime-dynamic (bull 8%, neutral 5%, bear 3%, panic 1%)
+# - Single stock limit: 2% max
+# - Sector concentration: < 30%
+# - Daily trade limit: 12 trades max
+# - VIX > 25: Reduce kelly_fraction by 50%
+# - Daily Loss limit: 2% (down from 3%)
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Premarket Hard Checks (v2.0 - New Section)
+# -----------------------------------------------------------------------------
+premarket_checks:
+  opening_gap_hard_block_pct: 10.0  # Block if gap > 10% or < -10%
+  min_vol_ratio: 0.3                # Block if relative volume < 0.3
+  min_sentiment_score: -0.7         # Block if sentiment < -0.7
+
+# -----------------------------------------------------------------------------
+# Stock Volatility Tiers
+# Classification based on ATR% (20-day) + Beta (1-year)
+# -----------------------------------------------------------------------------
+stock_tiers:
+  bluechip:
+    description: "Large-cap stable stocks (AAPL, MSFT, JNJ, etc.)"
+    criteria:
+      atr_pct_max: 0.035    # ATR% < 3,5%
+      beta_max: 1.3
+    examples: ["AAPL", "MSFT", "JNJ", "PG", "KO"]
+
+  mid_vol:
+    description: "Mid-volatility growth stocks"
+    criteria:
+      atr_pct_min: 0.035
+      atr_pct_max: 0.055
+      beta_min: 1.0
+      beta_max: 1.8
+    examples: ["CRM", "ADBE", "NOW", "SNOW"]
+
+  high_vol:
+    description: "High-volatility momentum stocks (our primary focus)"
+    criteria:
+      atr_pct_min: 0.055
+      atr_pct_max: 0.10
+      beta_min: 1.5
+    examples: ["TSLA", "NVDA", "AMD", "COIN", "PLTR"]
+
+  extreme_vol:
+    description: "Meme/event-driven stocks (handle with extreme caution)"
+    criteria:
+      atr_pct_min: 0.10
+    examples: ["GME", "AMC", "MARA", "RIOT"]
+
+# -----------------------------------------------------------------------------
+# Market Regimes (VIX-based primary classification)
+# -----------------------------------------------------------------------------
+market_regimes:
+  bull:
+    description: "Low volatility uptrend"
+    vix_range: [0, 18]
+    spy_trend: "up"
+    confidence_required: 0.6
+    overnight_max_pct: 0.08      # v2.0: Regime-dynamic overnight limit
+
+  range_bullish:
+    description: "Sideways with bullish bias"
+    vix_range: [15, 22]
+    spy_trend: "neutral"
+    confidence_required: 0.5
+    overnight_max_pct: 0.05      # v2.0: 5% overnight limit
+
+  range_bearish:
+    description: "Sideways with bearish bias"
+    vix_range: [18, 28]
+    spy_trend: "neutral"
+    confidence_required: 0.5
+    overnight_max_pct: 0.03      # v2.0: 3% overnight limit
+
+  bear:
+    description: "Elevated volatility downtrend"
+    vix_range: [22, 35]
+    spy_trend: "down"
+    confidence_required: 0.6
+    overnight_max_pct: 0.03      # v2.0: 3% overnight limit
+
+  panic:
+    description: "Extreme fear / market crash"
+    vix_range: [30, 100]
+    spy_trend: "down"
+    confidence_required: 0.7
+    overnight_max_pct: 0.01      # v2.0: 1% overnight limit (panic mode)
+
+# -----------------------------------------------------------------------------
+# Global Limits (v2.0 - New Section)
+# -----------------------------------------------------------------------------
+global_limits:
+  # Final target stock count after all filtering
+  final_target_stocks: 10          # v2.0: Down from 20
+
+  # Single stock position limit
+  max_single_stock_pct: 0.03       # V12: Max 3% per stock (enforced in code)
+
+  # Sector concentration limit
+  max_sector_concentration_pct: 0.30  # v2.0: Max 30% per sector (max 3 stocks)
+  max_stocks_per_sector: 3           # v2.0: Max 3 stocks in same sector
+
+  # Daily trading limits
+  max_daily_trades: 3              # V12: Max 3 new entries per day (was 12)
+
+  # Portfolio exposure limit
+  max_portfolio_exposure_pct: 0.40  # V12: Max 40% gross exposure (was 0.20 legacy yaml)
+
+  # Daily loss熔断 (reduced for tighter risk control)
+  daily_loss_limit_pct: 0.02        # v2.0: Down from 3% to 2%
+
+  # VIX-based dynamic adjustment
+  vix_high_threshold: 25            # v2.0: VIX > 25 triggers conservative mode
+  vix_high_kelly_reduction: 0.5    # v2.0: Reduce kelly by 50% when VIX > 25
+
+  # Correlation check
+  max_correlation_threshold: 0.75    # v2.0: If stocks have >0.75 correlation, reduce position
+
+  # Position time limit
+  max_position_time_min: 90          # v2.0: Force close after 90 minutes to prevent overnight risk
+
+  # V12 swing (enforced when STOCKAPP_V12_RISK=1)
+  symbol_cooldown_hours: 48
+  min_hold_days: 1
+  risk_per_trade_pct: 0.01
+  max_drawdown_pct: 8.0
+  min_entry_confidence: 0.70
+
+# V12 sizing policy (runtime: v12/src/stockapp_v12/core/sizing.py)
+v12_sizing:
+  sl_atr_multiple_default: 1.5
+  confidence_cap_discount_enabled: false
+  regime_multipliers:
+    BULL_LONG: 1.0
+    BULL_SHORT: 0.9
+    NEUTRAL: 0.8
+    BEAR_SHORT: 0.6
+    BEAR_LONG: 0.0
+    PANIC: 0.0
+
+# -----------------------------------------------------------------------------
+# Overnight Position Rules (v2.0 - New Section)
+# -----------------------------------------------------------------------------
+overnight_rules:
+  enabled: true
+
+  # Strong profit retention (only in bull regime)
+  strong_profit:
+    profit_pct_min: 3.0            # Profit > 3%
+    regime_required: "bull"         # Only in bull regime
+    retention_ratio: 0.5            # Keep 50% of position
+    max_positions: 2                # Max 2 strong profit positions overnight
+
+  # Mild profit - observe
+  mild_profit:
+    profit_pct_min: 1.0
+    profit_pct_max: 3.0
+    action: "observe"                # Observe, decide by 9:45 next day
+    total_overnight_limit_pct: 0.05 # Max 5% overnight for mild profits
+
+  # Small loss - keep but limit
+  small_loss:
+    loss_pct_min: -1.0
+    loss_pct_max: 1.0
+    action: "keep"                   # Keep position
+    total_overnight_limit_pct: 0.05 # Max 5% overnight for small losses
+
+  # Loss - force close
+  loss:
+    loss_pct_max: -1.0              # Loss > 1% → force close
+    action: "force_close"             # Clear position before close
+
+# -----------------------------------------------------------------------------
+# Regime-Specific Parameters
+# Format: [stock_tier].[market_regime]
+# -----------------------------------------------------------------------------
+regime_params:
+
+  # =========================================================================
+  # BLUECHIP STOCKS
+  # =========================================================================
+  bluechip:
+    bull:
+      trade_allowed: true
+      atr_threshold_multiplier: 0.9
+      kelly_fraction: 0.55
+      max_single_risk_pct: 2.0      # v2.0: Capped at 2%
+      max_position_time_min: 120
+      preferred_patterns: ["impulse_up", "breakout", "trend_continuation"]
+      stop_loss_atr_multiple: 1.5
+      take_profit_atr_multiple: 2.5
+      max_daily_trades: 5
+
+    range_bullish:
+      trade_allowed: true
+      atr_threshold_multiplier: 1.0
+      kelly_fraction: 0.45
+      max_single_risk_pct: 2.0      # v2.0: Capped at 2%
+      max_position_time_min: 60
+      preferred_patterns: ["mean_reversion", "support_bounce"]
+      stop_loss_atr_multiple: 1.2
+      take_profit_atr_multiple: 1.8
+      max_daily_trades: 4
+
+    range_bearish:
+      trade_allowed: true
+      atr_threshold_multiplier: 1.1
+      kelly_fraction: 0.35
+      max_single_risk_pct: 2.0      # v2.0: Capped at 2%
+      max_position_time_min: 45
+      preferred_patterns: ["mean_reversion"]
+      stop_loss_atr_multiple: 1.0
+      take_profit_atr_multiple: 1.5
+      max_daily_trades: 3
+
+    bear:
+      trade_allowed: false
+      reason: "Low reward/risk ratio for stable stocks in downtrend"
+
+    panic:
+      trade_allowed: false
+      reason: "Wait for stabilization"
+
+  # =========================================================================
+  # HIGH VOLATILITY STOCKS (Our Primary Focus)
+  # =========================================================================
+  high_vol:
+    bull:
+      trade_allowed: true
+      atr_threshold_multiplier: 0.85
+      kelly_fraction: 0.5
+      max_single_risk_pct: 2.0      # v2.0: Capped at 2% (from 6%)
+      max_position_time_min: 90       # v2.0: Capped at 90 minutes
+      preferred_patterns: ["any_trend"]
+      stop_loss_atr_multiple: 1.5
+      take_profit_atr_multiple: 3.0
+      max_daily_trades: 12
+
+    range_bullish:
+      trade_allowed: true
+      atr_threshold_multiplier: 1.0
+      kelly_fraction: 0.45
+      max_single_risk_pct: 2.0      # v2.0: Capped at 2% (from 5%)
+      max_position_time_min: 90       # v2.0: Capped at 90 minutes
+      stop_loss_atr_multiple: 1.3
+      take_profit_atr_multiple: 2.0
+      max_daily_trades: 10
+
+    range_bearish:
+      trade_allowed: true
+      atr_threshold_multiplier: 1.1
+      kelly_fraction: 0.35
+      max_single_risk_pct: 2.0      # v2.0: Capped at 2% (from 4%)
+      max_position_time_min: 90       # v2.0: Capped at 90 minutes (from 240)
+      stop_loss_atr_multiple: 1.2
+      take_profit_atr_multiple: 1.8
+      max_daily_trades: 8
+
+    bear:
+      trade_allowed: true
+      atr_threshold_multiplier: 1.2
+      kelly_fraction: 0.30
+      max_single_risk_pct: 2.0      # v2.0: Capped at 2% (from 3%)
+      max_position_time_min: 90       # v2.0: Capped at 90 minutes (from 120)
+      stop_loss_atr_multiple: 1.0
+      take_profit_atr_multiple: 1.5
+      max_daily_trades: 5
+      direction_bias: "neutral"
+
+    panic:
+      trade_allowed: true
+      atr_threshold_multiplier: 0.7
+      kelly_fraction: 0.15
+      max_single_risk_pct: 2.0      # v2.0: Capped at 2% (from 2%)
+      max_position_time_min: 60
+      stop_loss_atr_multiple: 0.8
+      take_profit_atr_multiple: 1.2
+      max_daily_trades: 5
+
+  # =========================================================================
+  # EXTREME VOLATILITY (Meme/Event-Driven)
+  # =========================================================================
+  extreme_vol:
+    bull:
+      trade_allowed: true
+      kelly_fraction: 0.30
+      max_single_risk_pct: 1.5      # v2.0: Capped at 1.5% for extreme volatility
+      max_position_time_min: 90       # v2.0: Capped at 90 minutes (from 390)
+      max_daily_trades: 8
+      stop_loss_atr_multiple: 2.0
+      take_profit_atr_multiple: 4.0
+
+    range_bullish:
+      trade_allowed: true
+      kelly_fraction: 0.20
+      max_single_risk_pct: 1.5      # v2.0: Capped at 1.5%
+      max_position_time_min: 90       # v2.0: Capped at 90 minutes
+      max_daily_trades: 5
+
+    range_bearish:
+      trade_allowed: true
+      kelly_fraction: 0.15
+      max_single_risk_pct: 1.5      # v2.0: Capped at 1.5%
+      max_position_time_min: 60
+      reason: "Shorting allowed with tight stops"
+
+    bear:
+      trade_allowed: true
+      kelly_fraction: 0.10
+      max_single_risk_pct: 1.5      # v2.0: Capped at 1.5%
+      max_position_time_min: 30
+      reason: "Short scalps only"
+
+    panic:
+      trade_allowed: false
+      reason: "Extreme risk of Halt/Gap"
+
+# -----------------------------------------------------------------------------
+# Regime Transition Rules
+# -----------------------------------------------------------------------------
+transitions:
+  buffer_period_minutes: 30
+  confirmation_required: true
+  confirmation_candles: 3
+  position_size_transition: "linear"
+  transition_periods: 5
+
+# -----------------------------------------------------------------------------
+# Agent Configuration (for MarketRegimeAgent)
+# -----------------------------------------------------------------------------
+agent_config:
+  evaluation_interval_minutes: 10
+  inputs:
+    - vix_current
+    - vix_5day_avg
+    - spy_20day_return
+    - market_breadth
+    - put_call_ratio
+    - sector_rotation_signal
+  redis_key: "market_regime:current"
+  event_channel: "events:regime_change"
+  output_schema:
+    regime: "string"
+    confidence: "float"
+    stock_tier: "string"
+    recommended_action: "string"
+    valid_until: "timestamp"
+
+# -----------------------------------------------------------------------------
+# L2 Catalyst Scorer — Regime Multipliers
+# Applied to composite score after tech + catalyst + sentiment scoring.
+# Format: regime_name -> multiplier (1.0 = neutral, >1.0 = bullish, <1.0 = bearish)
+# -----------------------------------------------------------------------------
+l2_catalyst_multipliers:
+  BULL_LONG: 1.2
+  BULL_SHORT: 1.1
+  NEUTRAL: 1.0
+  BEAR_SHORT: 0.9
+  BEAR_LONG: 0.8
+  PANIC: 0.5
+
+# Bidirectional mode: bearish candidates not penalized, short opportunities boosted
+l2_catalyst_multipliers_bidirectional:
+  BULL_LONG: 1.1       # slightly reduced (was 1.2) — less bull bias
+  BULL_SHORT: 1.05
+  NEUTRAL: 1.0
+  BEAR_SHORT: 1.0      # was 0.9 → now neutral (bearish = opportunity)
+  BEAR_LONG: 1.1       # was 0.8 → now slightly boosted (short candidates)
+  PANIC: 0.6           # was 0.5 → still cautious but less suppressed

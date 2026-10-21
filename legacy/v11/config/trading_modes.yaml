@@ -1,0 +1,51 @@
+modes:
+  live:
+    description: "Real money trading (Production)"
+    enabled: false
+    execution:
+      enabled: false  # Safety first
+      broker: "ibkr"
+      client_id_offset: 0
+    data:
+      source: "ibkr"
+      
+  paper_ibkr:
+    description: "Paper trading via IBKR TWS/Gateway"
+    enabled: true
+    execution:
+      enabled: true
+      broker: "ibkr"
+      client_id_offset: 0
+    data:
+      source: "ibkr"
+
+  shadow_longbridge:
+    description: "Shadow trading using Longbridge Data"
+    enabled: true
+    execution:
+      enabled: false # Mock execution
+      broker: "longbridge"
+    data:
+      source: "longbridge"
+
+  shadow_ibkr:
+    description: "Shadow trading using IBKR Data"
+    enabled: true
+    execution:
+      enabled: false # Mock execution
+      broker: "ibkr"
+      client_id_offset: 0
+    data:
+      source: "ibkr"
+
+eod_liquidation:
+  exempt_enabled: true
+  exempt_regimes: ["BULL_LONG", "NEUTRAL"]
+  exempt_profit_pct: 0.08           # Floating Profit > 8%
+  exempt_score_threshold: 0.75      # fused_score > 0.75
+  exempt_sentiment_threshold: 0.70  # sentiment > 0.7
+  exempt_leave_ratio: 0.30          # Keep 30%, Close 70%
+  exempt_max_per_stock_pct: 0.05    # Single stock < 5% NAV
+  exempt_max_total_pct: 0.20        # Total exempt < 20% NAV
+  exempt_max_symbols_per_day: 5     # Max 5 symbols/day
+  exempt_max_consecutive_days: 3    # Max 3 consecutive days

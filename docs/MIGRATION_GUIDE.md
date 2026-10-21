@@ -5,7 +5,8 @@
 
 > **⚠ Path convention (post-migration):** File paths in the checklist
 > tables below refer to V11-era locations (now under
-> `archive/v11-legacy-2026-07-09/`). The V12 equivalents live under
+> `archive/v11-legacy-2026-07-09/` in the private repo; a slimmed
+> reference copy is in [`legacy/v11/`](../legacy/v11/README.md)). The V12 equivalents live under
 > `src/stockapp_v12/`. For example, `src/services/position_manager.py`
 > → `src/stockapp_v12/services/position_manager.py`.
 

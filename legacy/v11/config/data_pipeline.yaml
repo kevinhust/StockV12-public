@@ -1,0 +1,33 @@
+# Data Pipeline Configuration for V12 Chronos Training
+# Used by v12/scripts/cache_d1_bars.py
+
+universe_source: "static"   # "static" or path to file
+
+static_universe:
+  # Small universe for initial validation (expand for production training)
+  - AAPL
+  - MSFT
+  - GOOGL
+  - AMZN
+  - META
+  - NVDA
+  - TSLA
+  - AMD
+  - NFLX
+  - CRM
+
+# Date range for fetching (use "today" for end_date to mean current date)
+start_date: "2020-01-01"
+end_date: "2025-06-20"   # or "today"
+
+output_dir: "data/d1"    # Will create partitioned structure here
+
+# Fetch settings
+chunk_size_days: 500     # Size of each chunk for pagination (to handle long history)
+adjust_prices: true      # Whether to prefer/use adjusted prices (Longbridge ForwardAdjust)
+max_symbols_per_run: 0   # 0 = all; set e.g. 50 to process in batches
+max_days_per_call: 2000  # Safety cap
+force_refresh: false     # If true, overwrite existing data
+
+# Logging
+log_level: "INFO"
